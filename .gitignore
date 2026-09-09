@@ -1,0 +1,30 @@
+__pycache__/
+*.py[cod]
+*$py.class
+
+*.mp4
+alignment_cache/
+
+# Model weights — download separately, see third_party/README.md
+*.pt
+*.pth
+*.th
+*.bin
+*.onnx
+*.safetensors
+third_party/models/
+third_party/*/DOVER-master/
+*.log
+logs/
+
+
+
+third_party/monst3r/monst3r_repo/
+
+# torch.distributed RPC writes generated modules into a mkdtemp dir next to the service
+third_party/*/tmp*/
+
+# OS / editor junk
+.DS_Store
+*.swp
+*~

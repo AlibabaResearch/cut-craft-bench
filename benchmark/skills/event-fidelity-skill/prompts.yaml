@@ -1,0 +1,65 @@
+# Event Fidelity Skill — runtime configuration
+#
+# A2 event fidelity is evaluated in TWO sub-steps, each with its own VLM
+# call, loaded via benchmark/skill_loader.py by benchmark/mode_c_eval.py:
+#
+#   - step1 (event chain selection): VLM watches the full video and picks
+#     the event-chain option that best matches the actual shot sequence.
+#     Uses SYSTEM_QA_A2 + dynamically built user text (alignment context
+#     injected at runtime; user text template stays in Python).
+#
+#   - step3 (per-event fidelity): VLM watches a per-shot clip and judges
+#     whether the intended event was Fully / Partially / Execution Failed.
+#     Uses SYSTEM_QA_A2_FIDELITY + user_template below.
+#
+# step2 is not a VLM call — it reads alignment_result to determine which
+# shots are missing and which have valid time ranges.
+#
+# Edit this file to tune either step's system prompt independently.
+
+step1:
+  # System prompt for the event-chain selection step.
+  # (Original SYSTEM_QA_A2 constant, no trailing newline.)
+  system_prompt: |-
+    You are a professional film editing analyst with expertise in shot segmentation. Your task is to select the event chain option that BEST matches the ACTUAL shots in the video.
+
+    CRITICAL RULES:
+    1. Watch the video carefully and observe the sequence of events/shots.
+    2. Each option uses ' --> ' to separate events describing a sequence of shots.
+    3. Select the option whose event descriptions match the video content IN ORDER from the beginning. The best option is the one with the MOST consecutive events matching the actual video content in the correct sequence.
+    4. Even if no option perfectly matches ALL shots in the video (e.g., the video has fewer shots than described), choose the option that matches the MOST events from the start in the correct order.
+    5. Focus on: (a) correct temporal ORDER of events, (b) accurate DESCRIPTION of each event.
+
+    Reply with ONLY the option letter (A/B/C/D). Do NOT provide any explanation.
+
+  # Note: the Step 1 user text is built dynamically in mode_c_eval.py:
+  # it injects the alignment_context block at runtime and stays in Python.
+
+step3:
+  # System prompt for per-event execution quality evaluation.
+  # (Original SYSTEM_QA_A2_FIDELITY constant, no trailing newline.)
+  system_prompt: |-
+    You are a professional video content analyst specializing in evaluating how well a video shot realizes its intended content description.
+
+    Watch the video clip carefully, then evaluate whether the described event/content was executed in this clip.
+
+    Answer with ONLY the option letter (A/B/C). Do NOT provide any explanation.
+
+  # User prompt template — {event_desc} is the only runtime variable.
+  user_template: |
+    The intended content for this video clip is:
+    "{event_desc}"
+
+    Based on what you actually SEE in the video clip, evaluate the execution quality of the described content:
+    A. Fully Executed - The described content is completely and accurately shown in this clip
+    B. Partially Executed - Some elements of the described content are present but incomplete, inaccurate, or only partially realized
+    C. Execution Failed - The described content is barely recognizable or completely absent from this clip
+
+    Answer with ONLY the option letter (A/B/C):
+
+  # Scoring map: A -> 1.0, B -> 0.5, C -> 0.1 (default on parse failure: 0.1)
+  scoring:
+    A: 1.0
+    B: 0.5
+    C: 0.1
+    default_on_failure: 0.1

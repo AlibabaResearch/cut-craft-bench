@@ -1,0 +1,46 @@
+# montage-edit -- declarative pipeline manifest for the edit baseline agent
+# Modelled on OpenMontage's pipeline_defs: stages declare the pipeline, Python tools execute it
+name: montage-edit
+version: "1.0"
+description: >
+  Split the structured multi-shot prompt in prompt.json into individual shots, rewrite each shot
+  into a single-shot generation prompt with Qwen3.7, plan the generation mode per transition type
+  (occlusion transitions use the previous shot's last frame as the i2v first frame, the rest are
+  independent t2v), generate every shot with WAN, and finally stitch the transitions with ffmpeg
+  according to optical_effect and the audio-visual relation, producing one film that follows the
+  professional editing instructions.
+category: montage-editing
+
+stages:
+  - name: segment
+    tool: lib/shot_segmenter.py
+    produces: shot_plan
+    desc: Parse the timing/camera/transition of every shot and compute each shot duration
+
+  - name: rewrite
+    tool: lib/prompt_rewriter.py
+    requires: [shot_plan]
+    produces: shot_plan.rewritten_prompt
+    desc: Qwen3.7 per-shot rewrite (5-layer framework + global context + continuity anchors), falling back to template assembly on failure
+
+  - name: plan
+    tool: lib/generation_planner.py
+    requires: [shot_plan]
+    produces: edit_decisions
+    desc: Decide t2v/i2v and the first-frame handoff from the previous shot's transition type, and emit the transition render parameters
+
+  - name: generate
+    tools: [tools/wan_t2v.py, tools/wan_i2v.py]
+    requires: [edit_decisions]
+    produces: clips
+    desc: Independent shots use t2v; occlusion-transition shots use the previous shot's last frame as the i2v first frame
+
+  - name: compose
+    tool: tools/video_compose.py
+    requires: [edit_decisions, clips]
+    produces: final_video
+    desc: ffmpeg transition stitching driven by optical_effect / audio-visual relation / timing
+
+  - name: report
+    produces: render_report
+    desc: Record each shot duration, the transitions, gen_mode, the total duration check and the failed items

@@ -1,0 +1,63 @@
+# CutCrafter unified environment (Python 3.10)
+#
+# This single conda env runs EVERYTHING: the agentic edit baseline, the
+# benchmark orchestration (mode A/B/C), and all expert-model services
+# under third_party/ (ports 8001-8015). There is no per-service env.
+#
+# Setup:
+#   conda create -n cutcrafter python=3.10 -y
+#   conda activate cutcrafter
+#   conda install -c conda-forge ffmpeg -y          # provides ffmpeg/ffprobe
+#   pip install -r requirements/cutcrafter.txt
+#
+# This lists only the DIRECT dependencies the project imports; pip pulls
+# their transitive deps (numba, transformers backends, huggingface-hub,
+# scikit-learn, matplotlib, ...) automatically. Versions are pinned to the
+# validated snapshot. GPU: torch is the CUDA 11.3 build, pulled from the
+# PyTorch index below -- adjust it if your CUDA runtime differs.
+
+--extra-index-url https://download.pytorch.org/whl/cu113
+torch==1.12.1+cu113
+torchvision==0.13.1+cu113
+torchaudio==0.12.1+cu113
+
+# --- orchestration: benchmark aggregation + agentic pipeline ---
+openai==2.45.0
+requests==2.34.2
+PyYAML==6.0.3
+numpy==1.26.4
+scipy==1.15.3
+tqdm==4.68.4
+
+# --- media / ffmpeg python libs ---
+ffmpeg-python==0.2.0
+moviepy==2.2.1
+imageio==2.37.3
+imageio-ffmpeg==0.6.0
+opencv-python-headless==4.9.0.80
+pillow==11.3.0
+
+# --- audio ---
+librosa==0.11.0
+soundfile==0.14.0
+
+# --- FastAPI serving stack (shared by every expert service) ---
+fastapi==0.139.2
+uvicorn==0.51.0
+python-multipart==0.0.32
+
+# --- expert models (third_party services 8001-8015) ---
+transnetv2-pytorch==1.0.5      # 8001 shot boundary
+open-clip-torch==2.20.0        # 8010/8012/8013 OpenCLIP
+openai-clip==1.0.1             # 8006 e2quality OpenAI CLIP (import clip)
+openai-whisper==20250625       # 8004 ASR
+demucs==4.0.1                  # 8005 source separation
+pyiqa==0.1.16                  # 8006 e2quality MUSIQ
+torchlibrosa==0.1.0            # 8007 PANNs
+ultralytics==8.4.96            # 8009 YOLOv8
+sixdrepnet==0.1.6              # 8014 head pose
+onnxruntime==1.23.2            # 8008 DNSMOS
+transformers==4.30.2           # backbones for several services
+timm==1.0.28                   # 8003 DINOv2 / ViT backbones
+roma==1.5.6                    # 8015 MonST3R
+einops==0.8.2                  # 8015 MonST3R

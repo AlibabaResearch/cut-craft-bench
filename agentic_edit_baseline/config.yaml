@@ -1,0 +1,165 @@
+# ============================================================
+# Global configuration for the edit baseline agent
+# ============================================================
+
+# ---- Video generation provider ----
+provider: wan
+
+# Text-to-video model (independent shots)
+t2v_model: wan2.7-t2v
+# Image-to-video model: only for wipe-by transitions / hard continuity from the previous shot's last frame
+# wan2.7-i2v uses the new media protocol and supports parameters.duration.
+i2v_model: wan2.7-i2v-2026-04-25
+i2v_duration_supported: true
+
+# Reference-to-video model: appearance reference for later shots with the same label; the reference image is not used as a first frame.
+r2v_model: wan2.7-r2v
+# wan2.7-r2v must go through the workspace maas endpoint: put the full video-synthesis URL here; empty uses the default DashScope endpoint.
+# Can also be set through the DASHSCOPE_VIDEO_CREATE_URL environment variable.
+wan_create_url: null
+
+# ---- Output frame parameters ----
+resolution: 720P        # 720P | 1080P
+ratio: "16:9"           # 16:9 | 9:16 | 1:1 | 4:3 | 3:4
+fps: 30
+target_duration: 15     # forced duration of the final cut (seconds)
+
+# ---- WAN per-task duration limits ----
+wan_min_duration: 2      # shortest duration WAN accepts (seconds)
+wan_max_duration: 15     # longest duration WAN accepts (seconds)
+
+# ---- Text-only LLM: DashScope Qwen3.7 (OpenAI-compatible endpoint) ----
+llm:
+  base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+  model: "qwen3.7-max"             # DashScope Qwen3.7-Max
+  keys_env: "DASHSCOPE_API_KEY"    # key is read from this env var (comma separated to rotate keys)
+  temperature: 0.5
+  max_tokens: 1024
+  enable: true                     # false, or a failed call, falls back to deterministic template assembly
+
+# ---- Cross-shot consistency + narrative linkage (Stage1.5) ----
+# One global pass over the whole case before per-shot rewriting: produces an Entity/Setting bible
+# and event lines, fixing environment/subject id drift; cross-cutting anchors on the logical predecessor shot of the same event line.
+consistency:
+  enable: true                     # disabled falls back to the physically previous shot as anchor
+  max_tokens: 4096                 # the global analysis output is large, so raise the token limit
+
+# ---- Generation planning: which transition types need last-frame-as-first-frame continuity ----
+# Wipe-by is always enabled; add other types as needed
+first_frame_continuity_types:
+  - "wipe-by"                      # wipe-by transition (substring match, case insensitive)
+
+# ---- Visual consistency policy ----
+visual_reference:
+  same_label_reference: true       # later same-label shots use a frame of the first successful shot as appearance reference
+  same_label_mode: r2v_reference   # r2v_reference=reference_image appearance reference; i2v_first_frame=legacy hard first-frame constraint
+  same_label_first_frame: false    # legacy compatibility; do not force i2v from a same-label first frame any more
+  reference_frame_position: 0.5    # the R2V reference takes a mid-clip frame so the first frame's framing does not lock later shots
+
+# ---- Single-shot generation constraints ----
+# Prevents a single WAN clip from cutting internally or panning fast, which would turn 4 planned shots into 5 visual ones.
+single_shot_guard:
+  enabled: true
+  prompt: null                 # empty uses the default single continuous take constraint
+  negative_prompt: null        # empty uses the default internal cut / fast camera move negatives
+
+# ---- Audio policy ----
+# Shot generation stage: only diegetic / physically motivated sound, no per-clip non-diegetic BGM;
+# if BGM is wanted it is added as a single global music bed after the final concat.
+audio:
+  suppress_clip_bgm: true
+  speech_reference_only: true       # audio_url is only a speech reference, ambience and instruments are not reused
+  negative_prompt_extra: null
+  # Extra audio headroom generated and stored per shot (seconds). It only lengthens gen_duration and
+  # the full track kept by Stage5, not net_duration, so the final runtime is unchanged. This leaves the
+  # D3 repair enough audio to shift when it widens the J/L-cut offset, instead of regenerating a shot.
+  headroom_seconds: 1.0
+  allow_scene_diegetic_music: true  # let diegetic music (dance battles, bands, speakers) continue across shots
+  sound_design:
+    enabled: true                   # from Stage1 on, plan diegetic sound and event-chain sound continuation per shot
+  clip_audio_cleanup:
+    enabled: true                   # conservative per-shot loudness normalisation, smoothing jumps between shots
+    target_lufs: -18
+    highpass_hz: 80
+    denoise: light                  # off/light; light uses a conservative afftdn
+  room_tone_floor:
+    enabled: true                   # add continuous diegetic room tone to near-silent shots to avoid audio cliffs
+    low_mean_threshold_db: -45      # a segment mean_volume below this needs compensation
+    low_max_threshold_db: -30       # a segment max_volume below this also counts as near-silent
+    floor_volume: 0.006             # very light room tone floor across the whole cut, keeping the space continuous
+    low_segment_volume: 0.12        # extra compensation gain for quiet shots
+    fade_seconds: 0.15
+    noise_color: brown
+    noise_amplitude: 0.18
+    always_floor: true
+  scene_audio_beds:
+    enabled: true
+    auto_detect: true
+    source_path: null               # optionally pin one diegetic music / ambience master
+    library_dirs: []                # optional: pick a scene-level diegetic bed from a library
+    volume: 0.35
+    fade_in_seconds: 0.2
+    fade_out_seconds: 0.4
+    target_lufs: -18
+  final_master:
+    enabled: true                   # single final loudness pass after all mixing
+    target_lufs: -16
+  global_bgm:
+    mode: off                     # no global BGM without a visible source; diegetic instruments come from the shots themselves
+    source_path: null             # optionally pin one mp3/wav; empty matches by style from library_dirs
+    library_dirs: []              # e.g. ["${BGM_LIBRARY_DIR}"]
+    volume: 0.18
+    fade_in_seconds: 1.0
+    fade_out_seconds: 1.5
+    loudnorm: false
+
+# ---- Paths ----
+# Relative paths are resolved against agentic_edit_baseline/ (see lib/config_paths.py);
+# to write artifacts to a disk outside the repo, export EDIT_BASELINE_OUT=/path/to/data.
+paths:
+  prompt_json: "../prompt/prompt.json"
+  # intermediate artifacts (shot_plan / edit_decisions / clips / render_report)
+  artifacts_dir: "${EDIT_BASELINE_OUT:-../outputs/edit_baseline}/artifacts"
+  # final output directory
+  output_dir: "${EDIT_BASELINE_OUT:-../outputs/edit_baseline}/wan"
+  # output directory of agent_loop.py (rolling evaluation + repair); empty reuses output_dir
+  agent_output_dir: "${EDIT_BASELINE_OUT:-../outputs/edit_baseline}/wan_agent"
+
+# ---- Central planner (agent_loop.py only, does not affect pipeline.py) ----
+# After a cut is generated: attribute failing B1/D2/D3 transitions -> call external tools -> emit repair actions.
+planner:
+  base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+  model: "qwen3.7-plus"           # qwen3.7-plus (supports function calling)
+  keys_env: "DASHSCOPE_API_KEY"
+  temperature: 0.2                # repair decisions need to be stable, so keep the temperature low
+  max_tokens: 2048
+  enable: true                    # false, or a missing key, falls back to the deterministic rule engine
+
+# ---- Rolling evaluation (agent_loop.py only) ----
+# The expert-model microservices use offset ports, fully isolated from the formal evaluation (8001-8015):
+#   TransNetV2 8101 / Whisper 8104 / Demucs 8105 / PANNs 8107
+#   start: bash agent_eval/start_agent_services.sh start
+#   the offset is configurable through AGENT_EVAL_PORT_OFFSET (default +100)
+evaluation:
+  dimensions: ["B1", "D2", "D3"]
+  thresholds:
+    B1: 0.90                      # transition timing (shot duration accuracy)
+    D2: 0.70                      # transition effect (5-way classification accuracy)
+    D3: 0.50                      # transition audio-visual relation (J/L/hard cut accuracy)
+  # ---- D3 pre-check audio gate ----
+  # Before scoring D3, measure each clip's loudness locally: without loud enough audio a J/L-cut
+  # cannot physically exist, so regenerate first with a prompt that demands stronger sound.
+  audio_gate:
+    enabled: true
+    min_full_dbfs: -40.0          # full-segment loudness below this counts as near-silent
+    min_boundary_dbfs: -45.0      # head/tail window below this counts as a silent boundary for J/L shots
+    boundary_window_seconds: 1.0  # head/tail window length
+    max_regen_attempts: 1         # max regenerations per shot caused by silence
+
+# ---- Agent main loop ----
+agent_loop:
+  max_repair_rounds: 2            # max repair rounds
+
+# ---- Polling / timeouts ----
+poll_interval: 15
+timeout: 1800

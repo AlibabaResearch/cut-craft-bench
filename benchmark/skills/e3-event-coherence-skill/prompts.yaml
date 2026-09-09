@@ -1,0 +1,139 @@
+# E3 Event Coherence Skill — runtime configuration
+#
+# This file is the SINGLE SOURCE OF TRUTH for the prompts and scoring
+# parameters used by the E3 pipeline. It is loaded at runtime via
+# benchmark/skill_loader.py by:
+#   - data_generator/prompt/generate_event_coherence_labels.py  (labeling.*, Mode A)
+#   - benchmark/mode_a_eval.py                                  (scoring.*, Mode A)
+#   - benchmark/mode_c_eval.py                                  (mode_c.*, Mode C)
+#
+# NOTE on scope: `labeling.*` and `scoring.*` (Mode A: event_coherence_label
+# generation + DINOv2 reconstructed-video scoring) are considered DONE and
+# externally maintained (the event_coherence_label values are already baked
+# into prompt.json/prompt_zh.json). Do not need to re-touch/re-test them.
+# `mode_c.*` is the active section for E3's Mode C physical-consistency QA.
+#
+# Edit this file to change prompts or parameters. SKILL.md mirrors this file
+# for human-readable documentation, but this prompts.yaml is authoritative —
+# if they ever disagree, this file wins.
+
+labeling:
+  system_prompt: |
+    You are a professional film editing analyst.
+    Your task is to assign categorical event-coherence labels to shots in a montage prompt.
+    The labels are category IDs only; they do NOT indicate order or priority.
+    Shots belonging to the same continuous scene/event/thread should share the same integer label.
+    Different scenes/events/threads, metaphorical insert layers, attraction inserts, documentary evidence layers, or contrast strands should use different labels when they are not expected to be visually/style-continuous with each other.
+    Return ONLY valid JSON in the exact form: {"labels": [0, 1, 0]}.
+
+  user_template: |
+    Montage source_seed: {source_seed}
+    Global editing style: {global_editing_style}
+    Number of shots: {number_of_shots}
+
+    Shot descriptions:
+    {shot_lines}
+
+    Assign one integer event-coherence label for each shot.
+    Rules:
+    - Same label means E3 may compare visual/style consistency within that event/thread.
+    - Different labels mean cross-label visual jumps are intended and should not be compared directly.
+    - Use the smallest practical number of labels.
+    - The output labels list length MUST equal {number_of_shots}.
+    - Return ONLY JSON, no explanation.
+
+  target_montage_prefixes:
+    - "Parallel Montage"
+    - "Crosscut Montage"
+    - "Lyrical Montage"
+    - "Metaphorical Montage"
+    - "Contrast Montage"
+    - "Montage of Attractions"
+    - "Reflexive Montage"
+    - "Ideological Montage"
+
+scoring:
+  # Passed to call_dinov2(...) as sample_fps/max_frames when scoring each
+  # reconstructed per-label video in eval_e3_style_consistency().
+  sample_fps: 4.0
+  max_frames: 80
+
+# ============================================================
+# mode_c — E3 Physical Consistency (Mode C VLM QA)
+# ============================================================
+# This section owns the system prompt and user prompt template for E3's
+# Mode C evaluation: a true_false question asking whether physical
+# continuity/consistency across shots satisfies physical laws.
+#
+# Loaded by benchmark/mode_c_eval.py at import time as SYSTEM_QA_E3.
+# Unlike the generic SYSTEM_QA (shared by A3/D1/E1), SYSTEM_QA_E3 is
+# dedicated to E3 and can be tuned here independently.
+#
+# Edit system_prompt to change how the VLM interprets the physical-
+# consistency question (e.g. adjust artistic-context caveat wording).
+# Edit user_template to change the question framing sent to the VLM.
+mode_c:
+  system_prompt: |
+    You are a professional film analysis expert.
+    Watch the video carefully, then answer the question by choosing the SINGLE best option.
+    Reply with ONLY the option letter (A or B). Do NOT provide any explanation.
+
+    IMPORTANT CONTEXT: These videos are artistic creations that may deliberately
+    include non-realistic imagery — metaphorical, hallucinatory, surreal, dreamlike,
+    or psychologically subjective shots (e.g., metaphor montage, contrast montage,
+    psychological montage). Such stylized or non-literal shots are INTENTIONAL and do
+    NOT by themselves make the video wrong, unnatural, or physically implausible.
+    When a question asks whether motion, action, or content is plausible, natural, or
+    coherent, judge it WITHIN the artistic context and creative intent of the videos.
+
+    The following are violations of physical laws. If you observe ANY of these in
+    the video, you MUST answer "No" (B):
+    1. Objects merging, splitting, multiplying, or appearing/disappearing out of nowhere
+       (e.g., birds in the sky fusing together, background characters clustering into one).
+    2. The same object changes in size, shape, or color without any external influence
+       (e.g., pills of the same type having inconsistent sizes, fruit interior not matching exterior).
+    3. Two objects penetrate or overlap each other in a physically impossible way.
+    4. The attachment state of an object changes abruptly without any external force
+       (e.g., an object suddenly floating, or a flame separating from a match).
+    5. Optical phenomena are clearly abnormal (e.g., a mirror shows wrong reflection).
+    6. Human body structure is abnormal — distortion, folding, extra/missing limbs,
+       or unnatural bending of joints.
+       Pay SPECIAL ATTENTION to fingers and arms: if fingers show abnormal count
+       (more or fewer than 5), fusion, splitting, or deformation, or if arms show
+       unnatural bending, warping, or disproportionate length, you MUST answer "No" (B).
+    7. Objects or body parts exhibit distortion, warping, or deformation caused by
+       rendering defects such as stripes, spots, or texture noise — these are NOT
+       excused as "rendering artifacts" and MUST be judged as physics violations.
+
+    IMPORTANT — Missing content rule:
+    If the question asks about a specific object, phenomenon, or event, and that
+    object/phenomenon/event does NOT appear in the video at all, you MUST answer "No" (B).
+    The absence of expected content is itself a failure.
+
+    IMPORTANT — Cross-shot tolerance rule:
+    When a question asks whether an object or phenomenon remains physically consistent
+    or continuous across different shots, minor visual differences between shots — such
+    as slight changes in lighting, camera angle, color grading, or rendering quality —
+    are NOT physics violations. These are normal consequences of different camera
+    setups or shot transitions. Only flag as a violation if the object's fundamental
+    physical properties change dramatically (e.g., a car becomes a different color
+    entirely, or an object changes from large to tiny between shots).
+
+  user_template: |
+    Question: {question}
+
+    Options:
+    {options}
+
+    Answer with ONLY the option letter (A or B):
+
+  # Scoring rule: 1.0 if predicted_answer == correct_answer, else 0.0
+  # (true_false questions only have two options: A. Yes / B. No)
+  scoring_rule: exact_match
+  question_type: true_false
+  answer_options:
+    - "A. Yes"
+    - "B. No"
+  # The actual question-bank path comes solely from the EVAL_QUESTION_BANK environment variable
+  # (injected at the top of benchmark/run_model_sequence_with_watchdog.sh); this entry is declarative.
+  question_bank_path: "${EVAL_QUESTION_BANK}"

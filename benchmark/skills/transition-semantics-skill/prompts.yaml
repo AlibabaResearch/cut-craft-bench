@@ -1,0 +1,108 @@
+# Transition Semantics Skill — runtime configuration
+#
+# This file is the single source of truth for the D1 (transition) prompts
+# used across both evaluation modes:
+#
+#   mode_b: benchmark/mode_b_eval.py — SYSTEM_D1_TRANSITION + the 8 per-type
+#           yes/no user prompt templates used by eval_d1_transition() and its
+#           _eval_d1_* helpers.
+#   mode_c: benchmark/mode_c_eval.py — the D1 single-choice QA prompt used by
+#           evaluate_single_question() (previously shared the generic
+#           SYSTEM_QA with A3/E1; now split into its own dedicated prompt).
+#
+# Loaded at runtime via benchmark/skill_loader.load_skill("transition-semantics-skill").
+# If this file is missing/broken, both mode_b_eval.py and mode_c_eval.py fall
+# back to the historical hardcoded prompts (with a printed [WARN]) so the
+# pipeline never crashes because of this skill.
+
+mode_b:
+  system_prompt: |-
+    You are a professional film editor specializing in transition analysis. Based on the expert model evidence and the video, determine whether the described transition technique was correctly executed. Answer with ONLY 'Yes' or 'No'.
+
+  templates:
+    logical: |-
+      At the transition from Shot {shot_from} to Shot {shot_to}:
+      {evidence}
+
+      Question: Does this transition establish a clear causal/logical relationship (i.e., the action or event in the preceding shot naturally motivates or leads to the content of the following shot)?
+      Answer: Yes or No
+
+    pov: |-
+      At the transition from Shot {shot_from} to Shot {shot_to}:
+      {evidence}
+
+      Question: Does this transition correctly implement a Point-of-View cut (one shot shows a character looking, the next shot shows what they see from their visual perspective)?
+      Answer: Yes or No
+
+    exit_enter: |-
+      At the transition from Shot {shot_from} to Shot {shot_to}:
+      Object detection edge analysis: {edge_analysis}
+
+      Question: Does the principal subject exit the frame in one shot and a subject enters the frame in the following shot (Exit-and-Entry transition)?
+      Answer: Yes or No
+
+    obstruction: |-
+      At the transition from Shot {shot_from} to Shot {shot_to}:
+      Saliency mask coverage: {mask_ratio}
+
+      Question: Is the transition masked by a foreground element passing through and momentarily occluding the frame (Wipe-By / Foreground-Occlusion transition)?
+      Answer: Yes or No
+
+    cutaway: |-
+      At the transition from Shot {shot_from} to Shot {shot_to}:
+      {evidence}
+
+      Question: Does this transition use a cutaway to scenery / empty shot (a landscape or object-only shot devoid of characters) as a bridging element?
+      Answer: Yes or No
+
+    whip_pan: |-
+      At the transition from Shot {shot_from} to Shot {shot_to}:
+      {evidence}
+
+      Question: Does this transition use rapid camera motion (whip pan, swish pan, or fast camera movement) to bridge between two disparate scenes?
+      Answer: Yes or No
+
+    extreme_scale: |-
+      At the transition from Shot {shot_from} to Shot {shot_to}:
+      {evidence}
+
+      Question: Does this transition cut from one extreme shot scale to the opposite extreme (e.g., Extreme Close-Up to Extreme Long Shot, or vice versa) to create a dramatic scale contrast?
+      Answer: Yes or No
+
+    generic: |-
+      At the transition from Shot {shot_from} to Shot {shot_to}:
+      Intended transition type: {ctype}
+      Design intent: {desc}
+
+      Question: Does this transition successfully convey the intended cinematographic effect described above?
+      Answer: Yes or No
+
+mode_c:
+  system_prompt: |-
+    You are a professional film analysis expert specializing in cinematographic transition/editing technique identification. Watch the video carefully, then answer the question by choosing the SINGLE best option that identifies the transition type used. Reply with ONLY the option letter. Do NOT provide any explanation.
+
+    Here are some easily confused transition categories—please pay close attention to them:
+
+    1. When the overall images of two shots are very similar, additional consideration is needed: if there are people (or animals) in the frame and their actions are continuous or similar, choose **Action Match**; if there are no people (or animals) in the frame, or the similarity is mainly compositional, choose **visual match**. **Action Match** is a stronger condition than visual match.
+
+    2. When identifying an **Exit-and-Entry Transition / Walk-Out / Walk-In Cut**, the subject exiting and entering the frame does not have to be the same thing; they may be different people, different objects, or even one person and one object.
+
+    3. If two shots show strong contrast in aspects such as camera movement or tonality, choose **Contrast Cut**. If the contrast lies in a drastic difference in shot scale, choose **Extreme Scale Cut / Polar-Scale Cut**. Shot-scale contrast is the stronger criterion: if there is a major scale contrast, **Extreme Scale Cut / Polar-Scale Cut** should be preferred over **Contrast Cut**. If the sequence first shows a close-up of a character and then presents a wide shot of what they see, **Point-of-View Cut** should be preferred over **Extreme Scale Cut / Polar-Scale Cut**.
+
+    4. **Cutaway to Scenery / Empty Shot Transition / Insert Shot** is generally defined as a transition where the first shot contains a subject (a person or an object), but the second shot is an empty shot. If no complete person appears in the frame (for example, only a shadow or a hand is shown), it may still be treated as a fallback case of **Cutaway to Scenery / Empty Shot Transition / Insert Shot**. If the transition consists of an empty shot plus a plot-driven shot, then another more appropriate transition type should be selected instead of **Cutaway to Scenery / Empty Shot Transition / Insert Shot**.
+
+    5. **Whip-Pan Transition / Camera-Movement Transition** requires rapid camera movement across the two shots; slow pushing in or slow camera movement does not count as **Whip-Pan Transition / Camera-Movement Transition**.
+
+    6. **Logical Cut / Causal Transition** is generally used in Dialogue Montage: the first shot asks a question, and the second shot answers it. In an ordinary chronological video, if there is a fairly clear causal relationship between two shots and no other transition type applies, **Logical Cut / Causal Transition** may be selected.
+
+  user_template: |
+    Question: {question}
+
+    {shot_context}Options:
+    {options}
+
+    Answer with ONLY the option letter (A/B/C/D/E):
+
+  shot_context_template: |-
+    [SHOT GENERATION INFO]
+    This video was intended to have {n_gt} shots, but only {n_actual} shots were actually generated. If the question asks about a shot number that is GREATER than {n_actual} (i.e., that shot was NOT generated), you MUST choose option E ('The shot(s) mentioned in this question were not generated in the video').

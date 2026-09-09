@@ -1,0 +1,3 @@
+# Keep this directory in Git, but ignore all evaluation videos and model folders.
+*
+!.gitignore

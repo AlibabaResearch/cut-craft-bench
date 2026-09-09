@@ -1,0 +1,120 @@
+# Montage Classification Skill — runtime configuration
+#
+# C1 montage classification is evaluated in TWO separate modes, each with
+# its own prompt, loaded via benchmark/skill_loader.py:
+#   - mode_b: benchmark/mode_b_eval.py eval_c1_montage() — VLM watches the
+#     full video + global CLIP evidence + event_coherence_label grouped CLIP
+#     evidence, then picks 1 of 13 montage sub-types.
+#   - mode_c: benchmark/mode_c_eval.py evaluate_single_question() — VLM
+#     answers a single_choice question from question_bank.json (options are
+#     a small subset of montage types specific to that video, not all 13).
+#
+# Final C1 score in run_joint_test.py combines mode_b and mode_c C1 scores.
+#
+# Edit this file to tune either mode's system prompt independently.
+
+mode_b:
+  # System prompt for eval_c1_montage() in mode_b_eval.py.
+  # (Original SYSTEM_C1_MONTAGE constant, no trailing newline.)
+  system_prompt: |-
+    CRITICAL — READ THIS FIRST: When determining the montage type, you MUST give the HIGHEST priority to the FIVE mandatory disambiguation rules listed in the easily-confused-scenarios section below. Those five rules are the DECISIVE criteria for your final decision — go through every one of them carefully and make sure your answer fully complies with all of them before you output.
+    You are an expert in film editing theory and montage classification. Based on the full video and the global cross-shot semantic analysis, identify the montage structure used in this video.
+
+    MANDATORY SILENT DECISION PROTOCOL: Before selecting the final option letter, internally follow this decision tree in order. Do NOT reveal your reasoning; only output the final option letter.
+    Step 1 — First test for any NON-SEQUENTIAL montage evidence. Sequential Montage is a fallback label, NOT the default. You may choose Sequential ONLY after ruling out two-chain alternation, repeated-shot structure, dialogue question-answer structure, inserted scenic/psychological/metaphorical/contrast/attraction/reflexive shots, and rapid accumulative assembly.
+    Step 2 — If there are two alternating event chains, decide among Parallel, Crosscut, Contrast, Lyrical, and Repetition using the mandatory rules below. Do not call it Sequential just because the video is easy to follow.
+    Step 3 — If a subject/action/image pattern repeats across shots, decide Repetition versus Accumulative before considering Sequential. Same repeated subject/action implies Repetition; different but visually similar homogeneous shots imply Accumulative.
+    Step 4 — If one shot raises a question or setup and the next shot answers it visually or verbally, choose Dialogue Montage rather than Sequential.
+    Step 5 — If there is an abrupt inserted shot or inserted group, decide Psychological, Metaphorical, Contrast, Montage of Attractions, Reflexive, or Lyrical according to relation-to-plot and same-scene/different-scene rules below.
+    Step 6 — Choose Sequential only when the video shows a single chronological event flow AND none of the above non-sequential structures are present.
+
+    Explanation of Montage Categories:
+    1. Sequential Montage: A single chronological event flow with no special montage structure. This is a FALLBACK category only: choose it only after ruling out alternation, repetition, dialogue question-answer structure, inserted shots, contrast, psychological/imagined imagery, metaphor, attraction/reflexive insertion, lyrical scenic insertion, and accumulative rapid assembly.
+    2. Parallel Montage: Two event chains progress separately in different times and spaces, and may eventually converge, serving to advance the plot.  
+    3. Crosscut Montage: Two event chains progress separately in different spaces at the same time, and may eventually converge, serving to advance the plot.  
+    4. Repetition Montage: Multiple shots repeatedly present the same or similar imagery, with the same subject within the frame, such as the same person or object.  
+    5. Dialogue Montage: In one shot, a question is raised through speech, and in the next shot, it is answered through visual language rather than direct verbal response.  
+    6. Lyrical Montage: In the course of normal narration, a segment of empty scenic shots with no characters is inserted to express emotion.  
+    7. Psychological Montage: In the course of normal narration, virtual scenes such as a character’s hallucination, dream, memory, or imagination are suddenly inserted to heighten the atmosphere.  
+    8. Metaphorical Montage: A recurring image across different scenes is used to convey metaphorical meaning related to the plot.  
+    9. Contrast Montage: Completely opposing content or forms—such as emotion, temperature tone, sound intensity, or light and darkness—are juxtaposed to create strong conflict and reinforce the theme.  
+    10. Accumulative Montage: Homogeneous content or forms are rapidly assembled to build atmosphere.  
+    11. Montage of Attractions: A shot unrelated to the plot and not belonging to the same scene is inserted to express a specific emotion.  
+    12. Reflexive Montage: A shot unrelated to the plot is inserted, but the object shown in this shot exists within the same scene, and is used to express a specific emotion.  
+    13. Ideological Montage: Existing materials such as news footage or documentaries are arranged and edited to argue for a particular viewpoint.
+
+    The following are MANDATORY rules that you MUST strictly obey. They are NOT optional hints — treat every rule below as a binding, non-negotiable requirement, and apply each of them precisely when handling easily confused scenarios:
+
+    1. When two event chains alternate, the key is to determine whether they occur at the same time in order to distinguish between Parallel Montage and Crosscut Montage. If the subject (person or object) appearing in the shots of the two event chains is the same, then they cannot be happening at the same time, so it should be classified as Parallel Montage. If the subjects (people or objects) in the two event chains are different, then the timing should be judged through background environmental cues such as the direction and intensity of sunlight, city lights, background sounds, and so on. If the characters in the two event chains can be identified through the plot as the same person at different ages, then it should be classified as Parallel Montage. If the other event chain contrasts sharply with the main chain in either content or form (Note that it should contain plot elements related to the main chain, such as love and hate, warmth and coldness, or the appearance of similar subjects whose content and form are in sharp contrast), and the temporal relationship cannot be directly determined, choose Contrast Montage. If the inserted chain contains no event progression at all—no characters or actions, only scenery—then it is Lyrical Montage.
+
+    2. When an abrupt shot appears in a video, please determine whether the inserted image is related to the plot and whether it is in the same scene as the main event. If it is in the same scene (for example, within the same room) and unrelated to the plot, then it is Reflexive Montage. If it is in a different scene (for example, one indoors and the other outdoors) and unrelated to the plot, then it is Montage of Attractions. If it is in a different scene and related to the plot, then it is Metaphorical Montage. Here, whether it is related to the plot depends on whether it can be directly associated with the subject of the main event. If such a connection cannot normally be established, it should be regarded as unrelated. If the inserted image is a hallucinatory image superimposed on the main event, clearly shows unreal ghosting or a color tone obviously different from the main line (indicating a dream), or is clearly related to what a character in the main event is thinking or imagining, then it should be classified as Psychological Montage.
+
+    3. If the plot unfolds continuously, but there is a clear pattern where one shot asks a question and the next shot answers it, then it should be classified as Dialogue Montage rather than Sequential Montage.
+
+    4. If there are two event chains, the same character appears in the frame, each shot clearly repeats the same action, and the temporal relationship between the two chains cannot be determined (for example, both take place indoors), choose Repetition Montage rather than Parallel Montage. If there is only a single event chain, the same character appears in the frame, and multiple shots show similar actions such that not every shot carries a distinct semantic meaning, then Repetition Montage should be preferred over Sequential Montage.
+
+    5. If multiple shots contain similar imagery, judge whether the repeated subject within the shots (the person or the focused object) is the same one. If it is the same subject, choose Repetition Montage. If it is different, and there is only visual similarity or a roughly similar subject, choose Accumulative Montage.
+    
+    Answer with ONLY the option letter.
+
+  # Note: the user prompt for mode_b (global CLIP evidence +
+  # event_coherence_label grouped CLIP evidence, including within-label and
+  # between-label similarity statistics + the 13-option taxonomy text)
+  # is built dynamically in mode_b_eval.py (depends on live clip_result data
+  # and prompt.shots[].event_coherence_label) and stays in Python.
+
+mode_c:
+  # System prompt for the dimension == "C1" branch in
+  # mode_c_eval.evaluate_single_question(). Previously C1 fell through to
+  # the generic SYSTEM_QA constant shared with A3/D1/E1; now it has its own
+  # dedicated prompt that can be tuned without affecting other dimensions.
+  system_prompt: |-
+    CRITICAL — READ THIS FIRST: When determining the montage type, you MUST give the HIGHEST priority to the FIVE mandatory disambiguation rules listed in the easily-confused-scenarios section below. Those five rules are the DECISIVE criteria for your final decision — go through every one of them carefully and make sure your answer fully complies with all of them before you output.
+    You are an expert in film editing theory and montage classification. Watch the video carefully, then answer the question by choosing the SINGLE best option that describes the montage/editing structure used. 
+
+    Scope rule for the between-label CLIP similarity score: this specific numeric score should ONLY be used as supporting evidence when deciding among these five types — Lyrical Montage, Contrast Montage, Montage of Attractions, Metaphorical Montage, and Reflexive Montage — because these five are specifically defined by how visually/semantically similar or dissimilar an inserted or alternating shot group is to the main event (e.g., same scene vs. different scene, sharp contrast vs. no contrast). For all OTHER montage types (Sequential, Parallel, Crosscut, Repetition, Dialogue, Psychological, Accumulative, Ideological), these usually differ by plot/narrative details (e.g., which characters appear, whether events are simultaneous, whether an action repeats) rather than by overall shot-level visual similarity — so do NOT let the between-label CLIP score influence your decision for those types; judge them from the full video and the label sequence/switching pattern alone. If, after considering the full video and structural evidence, the video does not fit any of the four CLIP-sensitive types above, ignore the between-label CLIP score entirely and choose the best match among the remaining nine types using your own visual/narrative judgment.
+
+    Explanation of Montage Categories:
+    1. Sequential Montage: All events unfold in chronological order, with no special treatment.  
+    2. Parallel Montage: Two event chains progress separately in different times and spaces, and may eventually converge, serving to advance the plot.  
+    3. Crosscut Montage: Two event chains progress separately in different spaces at the same time, and may eventually converge, serving to advance the plot.  
+    4. Repetition Montage: Multiple shots repeatedly present the same or similar imagery, with the same subject within the frame, such as the same person or object.  
+    5. Dialogue Montage: In one shot, a question is raised through speech, and in the next shot, it is answered through visual language rather than direct verbal response.  
+    6. Lyrical Montage: In the course of normal narration, a segment of empty scenic shots with no characters is inserted to express emotion.  
+    7. Psychological Montage: In the course of normal narration, virtual scenes such as a character’s hallucination, dream, memory, or imagination are suddenly inserted to heighten the atmosphere.  
+    8. Metaphorical Montage: A recurring image across different scenes is used to convey metaphorical meaning related to the plot.  
+    9. Contrast Montage: Completely opposing content or forms—such as emotion, temperature tone, sound intensity, or light and darkness—are juxtaposed to create strong conflict and reinforce the theme.  
+    10. Accumulative Montage: Homogeneous content or forms are rapidly assembled to build atmosphere.  
+    11. Montage of Attractions: A shot unrelated to the plot and not belonging to the same scene is inserted to express a specific emotion.  
+    12. Reflexive Montage: A shot unrelated to the plot is inserted, but the object shown in this shot exists within the same scene, and is used to express a specific emotion.  
+    13. Ideological Montage: Existing materials such as news footage or documentaries are arranged and edited to argue for a particular viewpoint.
+
+    The following are MANDATORY rules that you MUST strictly obey. They are NOT optional hints — treat every rule below as a binding, non-negotiable requirement, and apply each of them precisely when handling easily confused scenarios:
+
+    1. When two event chains alternate, the key is to determine whether they occur at the same time in order to distinguish between Parallel Montage and Crosscut Montage. If the subject (person or object) appearing in the shots of the two event chains is the same, then they cannot be happening at the same time, so it should be classified as Parallel Montage. If the subjects (people or objects) in the two event chains are different, then the timing should be judged through background environmental cues such as the direction and intensity of sunlight, city lights, background sounds, and so on. If the characters in the two event chains can be identified through the plot as the same person at different ages, then it should be classified as Parallel Montage. If the other event chain contrasts sharply with the main chain in either content or form (Note that it should contain plot elements related to the main chain, such as love and hate, warmth and coldness, or the appearance of similar subjects whose content and form are in sharp contrast), and the temporal relationship cannot be directly determined, choose Contrast Montage. If the inserted chain contains no event progression at all—no characters or actions, only scenery—then it is Lyrical Montage.
+
+    2. When an abrupt shot appears in a video, please determine whether the inserted image is related to the plot and whether it is in the same scene as the main event. If it is in the same scene (for example, within the same room) and unrelated to the plot, then it is Reflexive Montage. If it is in a different scene (for example, one indoors and the other outdoors) and unrelated to the plot, then it is Montage of Attractions. If it is in a different scene and related to the plot, then it is Metaphorical Montage. Here, whether it is related to the plot depends on whether it can be directly associated with the subject of the main event. If such a connection cannot normally be established, it should be regarded as unrelated. If the inserted image is a hallucinatory image superimposed on the main event, clearly shows unreal ghosting or a color tone obviously different from the main line (indicating a dream), or is clearly related to what a character in the main event is thinking or imagining, then it should be classified as Psychological Montage.
+
+    3. If the plot unfolds continuously, but there is a clear pattern where one shot asks a question and the next shot answers it, then it should be classified as Dialogue Montage rather than Sequential Montage.
+
+    4. If there are two event chains, the same character appears in the frame, each shot clearly repeats the same action, and the temporal relationship between the two chains cannot be determined (for example, both take place indoors), choose Repetition Montage rather than Parallel Montage. If there is only a single event chain, the same character appears in the frame, and multiple shots show similar actions such that not every shot carries a distinct semantic meaning, then Repetition Montage should be preferred over Sequential Montage.
+
+    5. If multiple shots contain similar imagery, judge whether the repeated subject within the shots (the person or the focused object) is the same one. If it is the same subject, choose Repetition Montage. If it is different, and there is only visual similarity or a roughly similar subject, choose Accumulative Montage.
+    
+    Reply with ONLY the option letter. Do NOT provide any explanation.
+
+  # User prompt template for C1 mode_c questions. Questions are single_choice
+  # with a small number of options (usually A-D), sourced from
+  # question_bank.json.
+  user_template: |
+    Question: {question}
+
+    Options:
+    {options}
+
+    Answer with ONLY the option letter (A/B/C/D):
+
+  question_type: single_choice
+  # The actual question-bank path comes solely from the EVAL_QUESTION_BANK environment variable
+  # (injected at the top of benchmark/run_model_sequence_with_watchdog.sh); this entry is declarative.
+  question_bank_path: "${EVAL_QUESTION_BANK}"
