@@ -271,3 +271,12 @@ model IDs, audio policies, output paths, and repair thresholds live in
 | `logs/<result-base>/<model>/` | Per-model scores, resumable state, and reports |
 
 
+## Citation
+```bibtex
+@article{zeng2026beyond,
+  title={Beyond Coherence: Benchmarking Professional Editing-Technique Execution in Multi-Shot Audio-Video Generation},
+  author={Zeng, Tianyi and Liao, Junchao and Wei, Yujie and Zhang, Ziying and Li, Litao and Wang, Tianyi and Wei, Zhichao and Xu, Shuyao and Qiang, Wenwen and Zhu, Siyu and Zhang, Zhenghao and Qin, Long},
+  journal={arXiv preprint arXiv:2609.08275},
+  year={2026}
+}
+```
