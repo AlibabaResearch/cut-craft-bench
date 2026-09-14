@@ -22,7 +22,7 @@ printed warning if the YAML is missing/broken.
 
 ## Purpose
 
-Use this skill for the current A2 event execution / event fidelity VLM evaluation in Bench-A-V-Phys. It wraps the prompts and scoring rules currently implemented in `benchmark/mode_c_eval.py`.
+Use this skill for the current A2 event execution / event fidelity VLM evaluation in CutCraft. It wraps the prompts and scoring rules currently implemented in `benchmark/mode_c_eval.py`.
 
 ## Source Code
 

@@ -16,7 +16,7 @@ Both call sites wrap the loading in `try/except`; if `prompts.yaml` is missing o
 
 ## Purpose
 
-Use this skill for the current D1 transition evaluation in Bench-A-V-Phys (both Mode B semantic yes/no judging and Mode C transition-type single-choice QA).
+Use this skill for the current D1 transition evaluation in CutCraft (both Mode B semantic yes/no judging and Mode C transition-type single-choice QA).
 
 ## Source Code
 

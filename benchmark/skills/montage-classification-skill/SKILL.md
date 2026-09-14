@@ -24,7 +24,7 @@ source of truth for BOTH modes:
 
 ## Purpose
 
-Use this skill for the current C1 montage-type VLM evaluation in Bench-A-V-Phys. It wraps the prompt and rubric currently implemented in `benchmark/mode_b_eval.py` for `eval_c1_montage`.
+Use this skill for the current C1 montage-type VLM evaluation in CutCraft. It wraps the prompt and rubric currently implemented in `benchmark/mode_b_eval.py` for `eval_c1_montage`.
 
 ## Source Code
 

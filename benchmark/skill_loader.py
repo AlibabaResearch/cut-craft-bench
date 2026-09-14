@@ -1,5 +1,5 @@
 """
-Generic runtime loader for Bench-A-V-Phys VLM skill configuration files.
+Generic runtime loader for CutCraft VLM skill configuration files.
 
 Skills live under benchmark/skills/<skill-name>/. Each skill directory has a
 SKILL.md (human-readable documentation for the AI agent / developers) and,

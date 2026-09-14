@@ -30,7 +30,7 @@ is authoritative if they ever disagree.
 
 ## Purpose
 
-Use this skill for E3 event-coherence label generation and the current E3 Mode A scoring semantics in Bench-A-V-Phys. It combines the existing VLM label prompt from `generate_event_coherence_labels.py` with the current reconstructed-video scoring logic from `mode_a_eval.py`.
+Use this skill for E3 event-coherence label generation and the current E3 Mode A scoring semantics in CutCraft. It combines the existing VLM label prompt from `generate_event_coherence_labels.py` with the current reconstructed-video scoring logic from `mode_a_eval.py`.
 
 ## Source Code
 
